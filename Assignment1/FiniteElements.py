@@ -59,7 +59,7 @@ class FiniteElements_1D:
         plt.plot(np.linspace(self.start,self.end,np.shape(real)[0]), real, drawstyle='default', color='red', linewidth=2, label='Real Solution')
         plt.legend()
         plt.grid(True, linestyle='--', alpha=0.5)
-        plt.show()
+        # plt.show()
 
 class problem1:
     def __init__(self, n, a, b, mu):
@@ -81,14 +81,29 @@ class problem1:
             raise Exception("Beta or Nu is 0, cannot compute real solution for this case")
         if np.any(0>x) or np.any(x>1):
             warnings.warn("\033[93m Warning: x is out of bounds\033[0m")
-        return 1/(self.mu[2])*x - (np.exp(self.mu[2]/self.mu[0] * x))/(self.mu[2]*(math.exp(self.mu[2]/self.mu[0]) - 1)) + 1/(self.mu[2]*(math.exp(self.mu[2]/self.mu[0]) - 1))
+        self.mu[0] = np.longdouble(self.mu[0])
+        return 1/(self.mu[2])*x - (np.exp(self.mu[2]/self.mu[0] * x))/(self.mu[2]*(np.exp(self.mu[2]/self.mu[0]) - 1)) + 1/(self.mu[2]*(np.exp(self.mu[2]/self.mu[0]) - 1))
 
-n = 1000
-prob = problem1(n, 0, 1, [1, 0, 1])
+
+# for nu in [10**(-3), 10**(-4)]:
+#     for i in range(4):
+#         n = [10,100,1000,10000][i]
+#         prob = problem1(n, 0, 1, [nu, 0, 1])
+#         prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
+
+#         prob1.solve()
+#         # prob1.visualize()
+#         x = np.linspace(0, 1,100)
+#         y = prob.realSolution(x)
+#         plt.subplot(2,2,i+1)
+#         prob1.comparePlot(y)
+#     plt.show()
+n=10
+prob = problem1(n, 0, 1, [0.01, 0, -1])
 prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
-
 prob1.solve()
 # prob1.visualize()
 x = np.linspace(0, 1,100)
 y = prob.realSolution(x)
 prob1.comparePlot(y)
+plt.show()
