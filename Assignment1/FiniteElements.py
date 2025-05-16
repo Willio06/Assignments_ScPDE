@@ -31,35 +31,45 @@ class FiniteElements_1D:
 
         return x
     
-    def visualize(self):
-        # Build step-style x and y values for piecewise constant line
-        x_step = np.arange(self.start, self.end+self.h/2, self.h)# + self.h/2 such that the end is included, without extra point
-        # Plot
-        plt.plot(x_step, self.x, drawstyle='default', color='blue', linewidth=2)
+    def plotter(self, x, y=None, title=None, xlabel=None, ylabel=None, logscale=False, labelx=None, labely=None):
+        size_x  = np.shape(x)[0]
+
+        x_step = np.arange(self.start, self.end, (self.end-self.start)/size_x)
+
+        plt.plot(x_step, x, drawstyle='default', color='blue', linewidth=2,label=labelx)
         plt.xlim(self.start, self.end)
         # plt.ylim(0, max(self.x) * 1.1)
-        plt.xlabel('X axis')
-        plt.ylabel('Y axis')
-        plt.title('Piecewise constant line plot of vector x')
+       
+        if y is not None:
+            size_y  = np.shape(y)[0]
+            y_step = np.arange(self.start, self.end, (self.end-self.start)/size_y)
+            plt.plot(y_step, y, drawstyle='default', color='red', linewidth=2,label=labelx)
+            plt.legend()
+
+
+        plt.xlabel(xlabel if xlabel else 'X axis')
+        plt.ylabel(ylabel if ylabel else 'Y axis')
+        if logscale:
+            plt.yscale('log')
+        else:
+            plt.yscale('linear')
+        plt.title(title if title else 'Plot title')
         plt.grid(True, linestyle='--', alpha=0.5)
-        plt.show()
+    
+    def visualize(self):
+        try:
+            self.x
+        except AttributeError as e:
+            print("\033[91mERROR: No solution found, please run solve() first.\033[0m")
+        # Build step-style x and y values for piecewise constant line
+        self.plotter(self.x, title=f'FEM Solution with n={self.N}', xlabel='X axis', ylabel='Y axis')
     def comparePlot(self, real):
         try:
             self.x
         except AttributeError as e:
             print("\033[91mERROR: No solution found, please run solve() first.\033[0m")
-        x_step = np.arange(self.start, self.end+self.h/2, self.h)# + self.h/2 such that the end is included, without extra point
-        # Plot
-        plt.plot(x_step, self.x, drawstyle='default', color='blue', linewidth=2, label='FEM Solution')
-        plt.xlim(self.start, self.end)
-        # plt.ylim(0, max(self.x) * 1.1)
-        plt.xlabel('X axis')
-        plt.ylabel('Y axis')
-        plt.title(f'FEM Solution with n={self.N} vs Real Solution')
-        plt.plot(np.linspace(self.start,self.end,np.shape(real)[0]), real, drawstyle='default', color='red', linewidth=2, label='Real Solution')
-        plt.legend()
-        plt.grid(True, linestyle='--', alpha=0.5)
-        # plt.show()
+        self.plotter(self.x, real, title=f'FEM Solution with n={self.N} vs Real Solution', xlabel='X axis', ylabel='Y axis', labelx="FEM solution", labely="real solution")
+
 
 class problem1:
     def __init__(self, n, a, b, mu):
@@ -83,27 +93,58 @@ class problem1:
             warnings.warn("\033[93m Warning: x is out of bounds\033[0m")
         self.mu[0] = np.longdouble(self.mu[0])
         return 1/(self.mu[2])*x - (np.exp(self.mu[2]/self.mu[0] * x))/(self.mu[2]*(np.exp(self.mu[2]/self.mu[0]) - 1)) + 1/(self.mu[2]*(np.exp(self.mu[2]/self.mu[0]) - 1))
+    def realDerivative(self,x):
+        if self.mu[2] == 0 or self.mu[0] == 0:
+            raise Exception("Beta or Nu is 0, cannot compute real solution for this case")
+        if np.any(0>x) or np.any(x>1):
+            warnings.warn("\033[93m Warning: x is out of bounds\033[0m")
+        self.mu[0] = np.longdouble(self.mu[0])
+        return 1/(self.mu[2])- (np.exp(self.mu[2]/self.mu[0] * x))/(self.mu[0]*(np.exp(self.mu[2]/self.mu[0]) - 1))
 
 
-# for nu in [10**(-3), 10**(-4)]:
-#     for i in range(4):
-#         n = [10,100,1000,10000][i]
-#         prob = problem1(n, 0, 1, [nu, 0, 1])
-#         prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
 
-#         prob1.solve()
-#         # prob1.visualize()
-#         x = np.linspace(0, 1,100)
-#         y = prob.realSolution(x)
-#         plt.subplot(2,2,i+1)
-#         prob1.comparePlot(y)
-#     plt.show()
-n=10
-prob = problem1(n, 0, 1, [0.01, 0, -1])
-prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
-prob1.solve()
-# prob1.visualize()
-x = np.linspace(0, 1,100)
-y = prob.realSolution(x)
-prob1.comparePlot(y)
-plt.show()
+def exA():
+    for nu in [10**(-3), 10**(-4)]:
+        for i in range(4):
+            n = [10,100,1000,10000][i]
+            prob = problem1(n, 0, 1, [nu, 0, 1])
+            prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
+
+            prob1.solve()
+            # prob1.visualize()
+            x = np.linspace(0, 1,100)
+            y = prob.realSolution(x)
+            plt.subplot(2,2,i+1)
+            prob1.comparePlot(y)
+        plt.show()
+
+def exB():
+    Errors1 =[]
+    Errors2=[]
+    m =20
+    for n in np.linspace(10,10**4,m):
+        n = int(n)
+        print(n)
+        prob = problem1(n, 0, 1, [1, 0, 1])
+        prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
+        prob1.solve()
+        Fem = prob1.x
+        real = prob.realSolution(np.linspace(0, 1, n+1))
+        realder = prob.realDerivative(np.linspace(0, 1, n+1))
+        FEMder = np.append((Fem[1:] - Fem[:-1]) / prob1.h,(Fem[-1] - Fem[-2]) / prob1.h)   
+        errorDer = np.square(np.abs(FEMder - realder))
+        error = np.square(np.abs(Fem - real))
+        NormL2 = np.sqrt((prob1.h / 2) * np.sum(error[:-1] + error[1:])) # inside trapezium rule for integrating
+        NormH1 = np.sqrt((prob1.h/2 )* np.sum(errorDer[:-1] + errorDer[1:])) + NormL2**2
+        Errors1.append(NormL2)
+        Errors2.append(NormH1)
+    plt.plot(np.linspace(10,10**4,m), Errors1,linewidth=2, label="L2 norm" )
+    plt.plot(np.linspace(10,10**4,m), Errors2,linewidth=2 , label="H1 norm")
+
+    plt.title("L2 en H1 norm of FEM approximation error")
+    plt.xlabel("Size of N")
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+
+exB()
