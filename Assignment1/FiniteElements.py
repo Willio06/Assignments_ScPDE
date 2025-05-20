@@ -103,7 +103,7 @@ class problem1:
 
 
 
-def exA():
+def ex1_5b():
     for nu in [10**(-3), 10**(-4)]:
         for i in range(4):
             n = [10,100,1000,10000][i]
@@ -118,23 +118,25 @@ def exA():
             prob1.comparePlot(y)
         plt.show()
 
-def exB():
-    Errors1 =[]
-    Errors2=[]
-    m =20
+def ex1_5c():
+    Errors1 =[] #L2 error
+    Errors2=[] #H1 error
+    m =20 # number of approximations N
     for n in np.linspace(10,10**4,m):
         n = int(n)
-        print(n)
-        prob = problem1(n, 0, 1, [1, 0, 1])
+        prob = problem1(n, 0, 1, [1, 0, 1]) # data from the porblem
         prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
         prob1.solve()
+
         Fem = prob1.x
         real = prob.realSolution(np.linspace(0, 1, n+1))
         realder = prob.realDerivative(np.linspace(0, 1, n+1))
-        FEMder = np.append((Fem[1:] - Fem[:-1]) / prob1.h,(Fem[-1] - Fem[-2]) / prob1.h)   
+
+        FEMder = np.append((Fem[1:] - Fem[:-1]) / prob1.h,(Fem[-1] - Fem[-2]) / prob1.h) #do forward difference, add backwards difference as last 
         errorDer = np.square(np.abs(FEMder - realder))
         error = np.square(np.abs(Fem - real))
-        NormL2 = np.sqrt((prob1.h / 2) * np.sum(error[:-1] + error[1:])) # inside trapezium rule for integrating
+
+        NormL2 = np.sqrt((prob1.h / 2) * np.sum(error[:-1] + error[1:])) # trapezium rule for integrating + sqrt
         NormH1 = np.sqrt((prob1.h/2 )* np.sum(errorDer[:-1] + errorDer[1:])) + NormL2**2
         Errors1.append(NormL2)
         Errors2.append(NormH1)
@@ -144,7 +146,9 @@ def exB():
     plt.title("L2 en H1 norm of FEM approximation error")
     plt.xlabel("Size of N")
     plt.yscale('log')
+    plt.grid(True, linestyle='--', alpha=0.5)
+
     plt.legend()
     plt.show()
 
-exB()
+ex1_5c()
