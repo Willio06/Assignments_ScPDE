@@ -8,11 +8,15 @@ import numpy as np
 
 class DofHandler:
     def __init__(self, grid: Grid, fe: FE):
-        # TODO: Create a dictionary, called self.local_to_global_map, that maps pairs of triangle index k and local Lagrange node index i to the index of the corresponding global node.
         self.fe = fe
         self.grid = grid
-        # TODO: Store global DoF coordinates in self.nodes.
-
+        self.local_to_global_map = {}
+        
+        for i, triangle in enumerate(grid.triangles):
+            for k in range(len(triangle)):
+                self.local_to_global_map[(i, k)] = triangle[k]
+        
+        self.nodes = grid.nodes
     def __len__(self) -> int:
         return len(self.nodes)
 

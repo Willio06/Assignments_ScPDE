@@ -71,4 +71,5 @@ class Grid:
 
 
 if __name__ == '__main__':
-    Grid.read_from_file(Path('data/coarse_mesh.txt'))
+    grid = Grid.read_from_file(Path('data/coarse_mesh.txt'))
+    print(grid)

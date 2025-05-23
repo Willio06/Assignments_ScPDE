@@ -31,7 +31,10 @@ class TriangleTransform:
         self.inverse_jacobian = np.linalg.inv(J)
         
     def F_T(self, x: Point) -> Point:
-        return self.J @ x + self.triangle[0]
+        # return np.array(self.jacobian) @ np.array(x + self.triangle[0])
+        return (x[0] * self.triangle[0]
+        + x[1] * self.triangle[1]
+        + x[2] * self.triangle[2])
     
     def F_T_inverse(self, x: Point) -> Point:
         return self.inverse_jacobian @ (x-self.triangle[0])
