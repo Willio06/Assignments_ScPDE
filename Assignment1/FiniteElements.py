@@ -108,7 +108,7 @@ def ex1_5b():
         for i in range(4):
             n = [10,100,1000,10000][i]
             prob = problem1(n, 0, 1, [nu, 0, 1])
-            prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
+            prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=True)
 
             prob1.solve()
             # prob1.visualize()
@@ -124,6 +124,7 @@ def ex1_5c():
     m =20 # number of approximations N
     for n in np.linspace(10,10**4,m):
         n = int(n)
+        print(n)
         prob = problem1(n, 0, 1, [1, 0, 1]) # data from the porblem
         prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
         prob1.solve()
@@ -150,5 +151,3 @@ def ex1_5c():
 
     plt.legend()
     plt.show()
-
-ex1_5c()
