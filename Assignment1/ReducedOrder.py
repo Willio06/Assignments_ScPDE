@@ -57,8 +57,8 @@ class ReducedOrder:
         self.B3 = B3
     def solve(self):
         x = cp.linalg.solve(self.A, self.b)
-        self.x = x
-        return x
+        self.x = self.C@x
+        return self.x
     def addBoundary(self, x: cp.ndarray):
         """Add a boundary condition to the solution."""
         # will be useless because the boundary condition is not approximated and thus will always have zero error value for any approximation with
@@ -141,9 +141,6 @@ def error(mus,P, greed=False):
         rb = ReducedOrder(mus,mu, boundary=0)
         x= rb.solve()
         xfem = rb.FEMx
-        cc = np.full(len(x), (N-1)//len(x), dtype=int) #extend x to length N
-        cc[: (N-1) % len(x)] += 1  # Adjust the last few elements to ensure correct length
-        x = cp.asarray(cp.repeat(cp.asnumpy(x), cc))
         listy = cp.append(listy,H2_norm_approx(x-xfem, h=1/N))
     if greed:
         diff = [mu for mu in P if not np.any(np.all(mus == mu, axis=1))]#set difference between P and mus
