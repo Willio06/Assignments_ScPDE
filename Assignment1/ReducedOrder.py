@@ -2,16 +2,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cupy as cp
 import time
-N = 10
+N = 10**3
 
 class ReducedOrder:
-    def __init__(self, mus,MU, boundary=0):
-        self.mus = mus # mu_i's
-        self.n = len(mus) 
-        self.MU = MU # the wanted mu
+    def __init__(self, mus=None,MU=None, boundary=0):
+        if mus is not None:
+            self.mus = mus # mu_i's
+            self.n = len(mus) 
+        if MU is not None:
+            self.MU = MU # the wanted mu
         self.boundary = boundary # adds zero boundary condition at the end if wanted
-        self.__MatrixAssembly()
-    def __FEMinit(self, mu, decompose=False, FEMsolve=False):
+        if mus is not None and MU is not None:
+            self.__MatrixAssembly()
+    def __FEMinit(self, mu, decompose=False):
         """
         Initialize the finite element method matrices based on the given mu.
         Solves if wanted, and returns the matrices A and b."""
@@ -21,29 +24,28 @@ class ReducedOrder:
         B3 = cp.diag(cp.full((N-2,), 1/2), 1)+ cp.diag(cp.full((N-2,), -1/2), -1)
         A = mu[0]*B1 + mu[1]*B2 + mu[2]*B3
         b = h*cp.ones(N-1)
-
-        if FEMsolve:
-            x = cp.linalg.solve(A, b)
-            self.FEMx = x
         if decompose:
             return mu[0]*B1, mu[1]*B2, mu[2]*B3,b
         return A, b
+    def FEMsolve(self,mu=None):
+        if mu is None: mu = self.MU
+        A,b = self.__FEMinit(mu)
+        self.FEMx = cp.linalg.solve(A,b)
+        return self.FEMx
     def __FEMspan(self):
         """
         Create a matrix C that spans the finite element space for the given mu_i's."""
         C = cp.zeros((N-1,self.n))
         for i in range(len(self.mus)):
             mu = self.mus[i]
-            A, b = self.__FEMinit(mu, FEMsolve=True) #solve the FEM problem for each mu_i
-            x = self.FEMx
-            C[:, i] = x
+            C[:, i] = self.FEMsolve(mu)
         return C
     def __MatrixAssembly(self):
         """
         Assemble the matrices A, B1, B2, B3 and b for the reduced order model."""
         C = self.__FEMspan()
         self.C = C
-        B1,B2,B3,b = self.__FEMinit(self.MU, decompose=True, FEMsolve=True) # note that the last femx is this one and thus for the wanted mu
+        B1,B2,B3,b = self.__FEMinit(self.MU, decompose=True) # note that the last femx is this one and thus for the wanted mu
         B1 = cp.transpose(C)@B1@C
         B2 = cp.transpose(C)@B2@C
         B3 = cp.transpose(C)@B3@C
@@ -134,19 +136,18 @@ def VromGreedy(p,initial=False, VromPrev=None):
     if(initial): #initial case
         Mnorm = cp.array([]) # array to store the H2 norms of the FEM solutions
         for mu in p:
-            femmer = ReducedOrder([mu], mu, boundary=0)# take for mus just mu, calculations will go faster with less mu, is not relevant here anyway just the FEM solution is needed
-            x = femmer.FEMx
-            Mnorm = cp.append(Mnorm,H2_norm_approx(x, h=1/N)) # compute the H2 norm of the FEM solution
+            x = ReducedOrder().FEMsolve(mu)
+            Mnorm = cp.append(Mnorm,H1_norm_approx(x, h=1/N)) # compute the H2 norm of the FEM solution
         selected = [p[cp.argmax(Mnorm).get()]] # start with the point with the highest H2 norm
         return selected
     elif VromPrev is not None:
         Mnorm = cp.array([])
         setdiff = [mu for mu in p if not np.any(np.all(VromPrev == mu, axis=1))]
         for mu in setdiff:
-            femmer = ReducedOrder(VromPrev, mu, boundary=0)
-            xfem = femmer.FEMx
-            xrb = femmer.solve()
-            Mnorm = cp.append(Mnorm, H2_norm_approx(xfem - xrb, h=1/N))  # compute the H2 norm of the difference
+            rb = ReducedOrder(VromPrev, mu, boundary=0)
+            xfem = rb.FEMsolve()
+            xrb = rb.solve()
+            Mnorm = cp.append(Mnorm, H1_norm_approx(xfem - xrb, h=1/N))  # compute the H2 norm of the difference
         selected = [setdiff[cp.argmax(Mnorm).get()]]  # select the point with the highest H2 norm
         return np.append(VromPrev, selected, axis=0)
 
@@ -158,7 +159,7 @@ def mixed_difference(x,h=1):
     diffs[:-1] = x[1:] - x[:-1]  # forward differences
     diffs[-1] = x[-1] - x[-2]    # backward difference for last element
     return diffs/h
-def H2_norm_approx(x,h=1):
+def H1_norm_approx(x,h=1):
     """
     Use trapezoidal rule to approximate the H2 norm of a 1D array.
     """
@@ -177,12 +178,12 @@ def error(mus, testP):
         mu = mu.tolist()
         rb = ReducedOrder(mus,mu, boundary=0)
         x= rb.solve()
-        xfem = rb.FEMx
-        listy = cp.append(listy,H2_norm_approx(x-xfem, h=1/N))
+        xfem = rb.FEMsolve()
+        listy = cp.append(listy,H1_norm_approx(x-xfem, h=1/N))
     return cp.max(listy), listy
 
-def ex3():
-    alternative = False
+def ex3(alternative = False):
+    
     testP = P(alternative=alternative).random(size=500) # generate random points in the parameter space for testing
     error1=[]
     t = time.time()
@@ -213,15 +214,16 @@ def ex3():
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.legend()
     plt.show()
-ex3()
+# ex3()
+ex3(True)
 def test():
     PP = P(10).random(size=2)
     rb = ReducedOrder(PP, [0.1,0,1], boundary=0)
     x = rb.solve()
     x = rb.addBoundary(x)  # add boundary condition if needed
-    xfem = rb.FEMx
+    xfem = rb.FEMsolve()
     xfem = rb.addBoundary(xfem)  # add boundary condition if needed
     rb.plotter(cp.asnumpy(x), cp.asnumpy(xfem), title="Reduced Order Model vs Finite Element Method", xlabel="x", ylabel="u(x)", labelx="ROM", labely="FEM")
-    print("H2 norm error:", H2_norm_approx(x-xfem, h=1/N))
+    print("H2 norm error:", H1_norm_approx(x-xfem, h=1/N))
     print("error: ", error(PP, P(10).random(size=500), greed=False)[0].get())
     plt.show()
