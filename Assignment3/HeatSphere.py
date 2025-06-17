@@ -44,8 +44,10 @@ class thetaMethod:
         return self.TimeMatrix
     def plotHeat(self):
         xticks = np.round(np.linspace(0,self.TimeLength*self.del_t, self.TimeLength), decimals=3)
+        xticks = np.where(np.arange(len(xticks)) % 2 == 1, "", xticks.astype(str))
         yticks = np.round(np.linspace(0,1,self.N_x), decimals=3)
-        ax = sns.heatmap(self.TimeMatrix, norm = LogNorm(), linewidth=0.5, xticklabels=xticks, yticklabels=yticks)
+        yticks = np.where(np.arange(len(yticks)) % 2 == 1, "", yticks.astype(str))
+        ax = sns.heatmap(self.TimeMatrix, linewidth=0, xticklabels=xticks, yticklabels=yticks, cmap = "magma")
         plt.xlabel("Time")
         plt.ylabel("Radius")
         plt.show()
@@ -76,7 +78,7 @@ class HeatTransfer:
         A[0,0] = -2
         A[0,1] = 2
         A[self.N_r-1, self.N_r-2]= 1
-        A[self.N_r-1, self.N_r-1] =  -(1 + self.Bi * self.delta_r)#-(2*self.Bi*self.delta_r**2 + 1+self.Bi*self.delta_r)
+        A[self.N_r-1, self.N_r-1] =  -(1 + self.Bi * self.delta_r + 2*self.Bi*self.delta_r**2)
 
         A = A/self.delta_r**2
         def b(t):
@@ -87,14 +89,13 @@ class HeatTransfer:
         self.vectorb = b
 
 np.set_printoptions(linewidth=200)
-N_x = 5
+N_x = 100
 N_t = 100
-classs = HeatTransfer(N_x, Bi=0.2, omega=0)
+classs = HeatTransfer(N_x, Bi=1, omega=2) #BI intenser? omega = frequency
 init =np.zeros(N_x)
-init[0]=30
 solver = thetaMethod(0.5, classs.matrixA, classs.vectorb, init,del_t=0.1, timeLength=N_t)
-for (n,un) in solver:
-    print("step ",n,":  ",un)
-# solver.solve()
+# for (n,un) in solver:
+#     print("step ",n,":  ",un)
+solver.solve()
 solver.plotHeat()
 print(classs.matrixA)
