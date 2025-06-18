@@ -2,9 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cupy as cp
 import time
-N = 10**3
-
+N = 10**3 #FEM dimension
+FEMdict={} #speed up calculations by saving FEM solutions globally
 class ReducedOrder:
+    global FEMdict
     def __init__(self, mus=None,MU=None, boundary=0):
         if mus is not None:
             self.mus = mus # mu_i's
@@ -29,8 +30,12 @@ class ReducedOrder:
         return A, b
     def FEMsolve(self,mu=None):
         if mu is None: mu = self.MU
-        A,b = self.__FEMinit(mu)
-        self.FEMx = cp.linalg.solve(A,b)
+        if str(mu) in FEMdict.keys():
+            return FEMdict[str(mu)]
+        else:
+            A,b = self.__FEMinit(mu)
+            self.FEMx = cp.linalg.solve(A,b)
+            FEMdict[str(mu)] = self.FEMx
         return self.FEMx
     def __FEMspan(self):
         """
@@ -80,7 +85,7 @@ class ReducedOrder:
         if y is not None:
             size_y  = np.shape(y)[0]
             y_step = np.arange(0,1, 1/size_y)
-            plt.plot(y_step, y, drawstyle='default', color='red', linewidth=2,label=labelx)
+            plt.plot(y_step, y, drawstyle='default', color='red', linewidth=2,label=labely)
             plt.legend()
 
 
@@ -134,22 +139,25 @@ class P:
 
 def VromGreedy(p,initial=False, VromPrev=None):
     if(initial): #initial case
-        Mnorm = cp.array([]) # array to store the H2 norms of the FEM solutions
+        Mnorm = cp.array([]) # array to store the H1 norms of the FEM solutions
         for mu in p:
             x = ReducedOrder().FEMsolve(mu)
-            Mnorm = cp.append(Mnorm,H1_norm_approx(x, h=1/N)) # compute the H2 norm of the FEM solution
-        selected = [p[cp.argmax(Mnorm).get()]] # start with the point with the highest H2 norm
+            Mnorm = cp.append(Mnorm,H1_norm_approx(x, h=1/N)) # compute the H1 norm of the FEM solution
+        selected = [p[cp.argmax(Mnorm).get()]] # start with the point with the highest H1 norm
         return selected
     elif VromPrev is not None:
         Mnorm = cp.array([])
-        setdiff = [mu for mu in p if not np.any(np.all(VromPrev == mu, axis=1))]
-        for mu in setdiff:
+        for mu in p:
+            if list(mu) in VromPrev.tolist(): #skip over mus in Vrom 
+                Mnorm  = cp.append(Mnorm,-1) # adding zero wont affect it, because the errors will be >=0, if this was max the rest would also be zero. This keeps dimension of Mnorm similar to p
+                continue
             rb = ReducedOrder(VromPrev, mu, boundary=0)
             xfem = rb.FEMsolve()
             xrb = rb.solve()
-            Mnorm = cp.append(Mnorm, H1_norm_approx(xfem - xrb, h=1/N))  # compute the H2 norm of the difference
-        selected = [setdiff[cp.argmax(Mnorm).get()]]  # select the point with the highest H2 norm
-        return np.append(VromPrev, selected, axis=0)
+            Mnorm = cp.append(Mnorm, H1_norm_approx(xfem - xrb, h=1/N))  # compute the H1 norm of the difference
+            index = cp.argmax(Mnorm).get()
+        selected = [p[index]]  # select the point with the highest H1 norm
+        return np.append(VromPrev, selected, axis=0), selected, Mnorm, index
 
 
 
@@ -159,16 +167,17 @@ def mixed_difference(x,h=1):
     diffs[:-1] = x[1:] - x[:-1]  # forward differences
     diffs[-1] = x[-1] - x[-2]    # backward difference for last element
     return diffs/h
+
 def H1_norm_approx(x,h=1):
     """
-    Use trapezoidal rule to approximate the H2 norm of a 1D array.
+    Use trapezoidal rule to approximate the H1 norm of a 1D array.
     """
     x = cp.abs(x) # note absolute value
     diffs = mixed_difference(x, h)
     # Use trapezoidal rule for numerical integration
     integral1 = cp.trapz(diffs**2, dx=h)
     integral2 = cp.trapz(x**2, dx=h)
-    return cp.asnumpy(cp.sqrt(integral1 + integral2))
+    return cp.asnumpy(cp.sqrt(integral1+integral2))
 
 
 def error(mus, testP):
@@ -183,47 +192,61 @@ def error(mus, testP):
     return cp.max(listy), listy
 
 def ex3(alternative = False):
-    
-    testP = P(alternative=alternative).random(size=500) # generate random points in the parameter space for testing
-    error1=[]
-    t = time.time()
-    Vrom1 = P(alternative=alternative).random(size=1) # generate random point in the parameter space
-    for n in range(2,51):
-        print("Computing non-greedy ROM for n =", n, " time elapsed:", time.time() - t)
+    blues = ['#87CEFA', '#1E90FF', '#4169E1', '#0000CD', '#000080']
+    reds= ["#FF7640", '#F4A460', '#FF8C00', "#C97353", '#D2691E']
+    for k in range(1):
+        testP = P(alternative=alternative).random(size=500) # generate random points in the parameter space for testing
+        error1=[]
         t = time.time()
-        Vrom1  = np.append(Vrom1, P(alternative=alternative).random(size=1), axis=0) # add randomly
-        error1.append(error(Vrom1, testP)[0].get())
-    
-    
-    error2=[] 
-    pTrain = P(alternative=alternative).random(size=500) # generate random points in the parameter space for training
-    Vrom1 = VromGreedy(pTrain,initial=True) # initialize the greedy ROM with the first point
-    for n in range(2,51):
-        print("Computing greedy ROM for n =", n, " time elapsed:", time.time() - t)
-        t = time.time()
-        Vrom1 = VromGreedy(pTrain, VromPrev=Vrom1) # greedily add to Vrom
-        error2.append(error(Vrom1, testP)[0].get())
-    plt.plot(range(2,51), error1, label="Non-Greedy ROM")
-    plt.plot(range(2,51), error2, label="Greedy ROM")
+        Vrom1 = P(alternative=alternative).random(size=50) # generate random point in the parameter space
+        for n in range(2,51):
+            print("Computing non-greedy ROM for n =", n, " time elapsed:", time.time() - t)
+            t = time.time()
+            error1.append(error(Vrom1[:n,:], testP)[0].get())
+        
+        
+        # error2=[] 
+        # pTrain = P(alternative=alternative).random(size=500) # generate random points in the parameter space for training
+        # Vrom1 = VromGreedy(pTrain,initial=True) # initialize the greedy ROM with the first point
+        # for n in range(2,51):
+        #     print("Computing greedy ROM for n =", n, " time elapsed:", time.time() - t)
+        #     t = time.time()
+        #     Vrom1 = VromGreedy(pTrain, VromPrev=Vrom1)[0] # greedily add to Vrom
+        #     error2.append(error(Vrom1, testP)[0].get())
+        plt.plot(range(2,51), error1,color = blues[k] ,label="Non-Greedy ROM"+str(k))
+        # plt.plot(range(2,51), error2,color= reds[k], label="Greedy ROM"+str(k))
     plt.xlabel("Number of basis functions")
-    print(error1)
-    print(error2)
-    plt.ylabel("Argmax H2 norm error")
+    plt.ylabel("Argmax H1 norm error")
     plt.title("Comparison of Greedy and Non-Greedy ROM")
     plt.yscale('log')
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.legend()
     plt.show()
-# ex3()
-ex3(True)
+
+
+ex3()
+# ex3(True) #alternative True, alternative P
+
+
 def test():
-    PP = P(10).random(size=2)
-    rb = ReducedOrder(PP, [0.1,0,1], boundary=0)
+    PP = P(10).random(size=500)
+    rb = ReducedOrder(PP, [0.02,0,1], boundary=0)
     x = rb.solve()
     x = rb.addBoundary(x)  # add boundary condition if needed
     xfem = rb.FEMsolve()
     xfem = rb.addBoundary(xfem)  # add boundary condition if needed
     rb.plotter(cp.asnumpy(x), cp.asnumpy(xfem), title="Reduced Order Model vs Finite Element Method", xlabel="x", ylabel="u(x)", labelx="ROM", labely="FEM")
-    print("H2 norm error:", H1_norm_approx(x-xfem, h=1/N))
-    print("error: ", error(PP, P(10).random(size=500), greed=False)[0].get())
+    print("H1 norm error:", H1_norm_approx(x-xfem, h=1/N))
+    print("error: ", error(PP, P(10).random(size=500))[0].get())
     plt.show()
+# test()
+def test2():
+    # Test if ROM gives same result as FEM for the SAME parameter
+    mu_test = [0.5, 0.3, 0.7]
+    mus_basis = [[0.1, 0.2, 0.4], [0.8, 0.6, 0.9]]  # basis parameters
+    # Create ROM with mu_test as the target parameter
+    rom = ReducedOrder(mus_basis, mu_test)
+    x_rom = rom.solve()  # ROM solution
+    x_fem = rom.FEMsolve(mu_test)  # FEM solution for same parameter
+    print("Error for same parameter:", H1_norm_approx(x_fem - x_rom, h=1/N))
+# test2()

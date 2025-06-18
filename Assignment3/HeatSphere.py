@@ -89,9 +89,9 @@ class HeatTransfer:
         self.vectorb = b
 
 np.set_printoptions(linewidth=200)
-N_x = 100
+N_x = 50
 N_t = 100
-classs = HeatTransfer(N_x, Bi=1, omega=2) #BI intenser? omega = frequency
+classs = HeatTransfer(N_x, Bi=0.1, omega=0.1) #BI intenser? omega = frequency
 init =np.zeros(N_x)
 solver = thetaMethod(0.5, classs.matrixA, classs.vectorb, init,del_t=0.1, timeLength=N_t)
 # for (n,un) in solver:
