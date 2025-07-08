@@ -47,11 +47,13 @@ class thetaMethod:
         xticks = np.round(np.linspace(0,self.TimeLength, self.TimeElements), decimals=3)
         xticks = np.where(np.arange(len(xticks)) % int(self.TimeElements/50) != 0, "", xticks.astype(str)) #print just 50 ticks on x-axis
         yticks = np.round(np.linspace(0,1,self.N_x), decimals=3)
-        yticks = np.where(np.arange(len(yticks)) % 2 == 1, "", yticks.astype(str))
+        if self.N_x > 10:
+            yticks = np.where(np.arange(len(yticks)) % int(self.N_x/10) != 0, "", yticks.astype(str))        
         ax = sns.heatmap(self.TimeMatrix, linewidth=0, xticklabels=xticks, yticklabels=yticks, cmap = "magma")
         plt.xlabel("Time")
         plt.ylabel("Radius")
-        plt.show()
+        plt.title("Heat Transfer in a Sphere, Theta Method for theta= "+str(self.theta))
+        # plt.show()
 class ExpRungeKutta:
     def __init__(self, A, b: Callable[[float], Any], init: np.ndarray, del_t =1/10, TimeElements=100):
         """
@@ -67,10 +69,44 @@ class ExpRungeKutta:
         self.N_x = len(init)
         self.del_t = del_t
         self.TimeElements = TimeElements
-        self.eigenvalues =np.diag(np.linalg.eigvals(A))
-        self.eigenvectors = np.linalg.eig(A)[1]
-    def _ExpMatrix(A):
-        return
+        self.TimeLength = int(TimeElements*del_t)
+
+        self.eigenvalues =np.linalg.eigvals(self.del_t *A)
+        self.eigenvectors = np.linalg.eig(self.del_t *A)[1]
+        self.expA = self.eigenvectors @ np.diag(np.exp(self.eigenvalues)) @ np.linalg.inv(self.eigenvectors)
+        self.phi1 = np.linalg.inv(del_t* self.A)@(self.expA - np.identity(self.N_x))
+        self.phi2 = np.linalg.inv(del_t* self.A)@(self.phi1 - np.identity(self.N_x))
+    def __iter__(self):
+        n,un = (1, self.init)
+        self.TimeMatrix = np.zeros((self.N_x,self.TimeElements))
+        self.TimeMatrix[:,n-1] = un
+        yield n,un
+        while n<self.TimeElements:
+            un = self.expA@un + self.del_t*self.phi1@self.b(self.del_t*n) + self.del_t*self.phi2@(self.b(self.del_t*(n+1))- self.b(self.del_t*n))
+            n+=1
+            self.TimeMatrix[:,n-1] = un
+            yield (n,un)
+    def solve(self):
+        """ if not iterated over solution this will do"""
+        n,un = (1, self.init)
+        self.TimeMatrix = np.zeros((self.N_x,self.TimeElements))
+        self.TimeMatrix[:,n-1] = un
+        while n<self.TimeElements:
+            un = self.expA@un + self.del_t*self.phi1@self.b(self.del_t*n) + self.del_t*self.phi2@(self.b(self.del_t*(n+1))- self.b(self.del_t*n))
+            n+=1
+            self.TimeMatrix[:,n-1] = un
+        return self.TimeMatrix
+    def plotHeat(self):
+        xticks = np.round(np.linspace(0,self.TimeLength, self.TimeElements), decimals=3)
+        xticks = np.where(np.arange(len(xticks)) % int(self.TimeElements/50) != 0, "", xticks.astype(str)) #print just 50 ticks on x-axis
+        yticks = np.round(np.linspace(0,1,self.N_x), decimals=3)
+        if self.N_x > 10:
+            yticks = np.where(np.arange(len(yticks)) % int(self.N_x/10) != 0, "", yticks.astype(str))
+        ax = sns.heatmap(self.TimeMatrix, linewidth=0, xticklabels=xticks, yticklabels=yticks, cmap = "magma")
+        plt.xlabel("Time")
+        plt.title("Heat Transfer in a Sphere, Exponential Runge-Kutta Method")
+        plt.ylabel("Radius")
+        # plt.show()
 class HeatTransfer:
     def __init__(self, N_r, R=1, Bi=1, omega=1):
         self.N_r = N_r
@@ -109,14 +145,20 @@ class HeatTransfer:
         self.vectorb = b
 
 np.set_printoptions(linewidth=200)
-N_x = 5
+N_x = 3
 N_t = 100
-classs = HeatTransfer(N_x, Bi=1, omega=2) #omega = frequency
-init =np.zeros(N_x)
-solver = thetaMethod(0, classs.matrixA, classs.vectorb, init,del_t=0.1, TimeElements=N_t)
+classs = HeatTransfer(N_x, Bi=100000, omega=1)
+# print(classs.matrixA)
+
+plt.subplot(1,2,1)
+solver = thetaMethod(0.5, classs.matrixA, classs.vectorb, np.zeros(N_x),del_t=0.1, TimeElements=N_t)
 # for (n,un) in solver:
 #     print("step ",n,":  ",un)
 solver.solve()
 solver.plotHeat()
-print(classs.matrixA)
-exp = ExpRungeKutta(classs.matrixA, classs.vectorb, init, del_t=0.1, TimeElements=N_t)
+
+plt.subplot(1,2,2)
+solverExp = ExpRungeKutta(classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=0.1, TimeElements=N_t)
+solverExp.solve()
+solverExp.plotHeat()
+plt.show()
