@@ -143,12 +143,12 @@ def VromGreedy(p,initial=False, VromPrev=None):
         for mu in p:
             x = ReducedOrder().FEMsolve(mu)
             Mnorm = cp.append(Mnorm,H1_norm_approx(x, h=1/N)) # compute the H1 norm of the FEM solution
-        selected = [p[cp.argmax(Mnorm).get()]] # start with the point with the highest H1 norm
-        return selected
+        selected = [list(p[cp.argmax(Mnorm).get()])] # start with the point with the highest H1 norm
+        return list(selected)
     elif VromPrev is not None:
         Mnorm = cp.array([])
         for mu in p:
-            if list(mu) in VromPrev.tolist(): #skip over mus in Vrom 
+            if list(mu) in VromPrev: #skip over mus in Vrom 
                 Mnorm  = cp.append(Mnorm,-1) # adding zero wont affect it, because the errors will be >=0, if this was max the rest would also be zero. This keeps dimension of Mnorm similar to p
                 continue
             rb = ReducedOrder(VromPrev, mu, boundary=0)
@@ -156,7 +156,7 @@ def VromGreedy(p,initial=False, VromPrev=None):
             xrb = rb.solve()
             Mnorm = cp.append(Mnorm, H1_norm_approx(xfem - xrb, h=1/N))  # compute the H1 norm of the difference
             index = cp.argmax(Mnorm).get()
-        selected = [p[index]]  # select the point with the highest H1 norm
+        selected = [list(p[index])]  # select the point with the highest H1 norm
         return np.append(VromPrev, selected, axis=0), selected, Mnorm, index
 
 
@@ -194,7 +194,7 @@ def error(mus, testP):
 def ex3(alternative = False):
     blues = ['#87CEFA', '#1E90FF', '#4169E1', '#0000CD', '#000080']
     reds= ["#FF7640", '#F4A460', '#FF8C00', "#C97353", '#D2691E']
-    for k in range(1):
+    for k in range(5):
         testP = P(alternative=alternative).random(size=500) # generate random points in the parameter space for testing
         error1=[]
         t = time.time()
@@ -205,16 +205,16 @@ def ex3(alternative = False):
             error1.append(error(Vrom1[:n,:], testP)[0].get())
         
         
-        # error2=[] 
-        # pTrain = P(alternative=alternative).random(size=500) # generate random points in the parameter space for training
-        # Vrom1 = VromGreedy(pTrain,initial=True) # initialize the greedy ROM with the first point
-        # for n in range(2,51):
-        #     print("Computing greedy ROM for n =", n, " time elapsed:", time.time() - t)
-        #     t = time.time()
-        #     Vrom1 = VromGreedy(pTrain, VromPrev=Vrom1)[0] # greedily add to Vrom
-        #     error2.append(error(Vrom1, testP)[0].get())
+        error2=[] 
+        pTrain = P(alternative=alternative).random(size=500) # generate random points in the parameter space for training
+        Vrom1 = VromGreedy(pTrain,initial=True) # initialize the greedy ROM with the first point
+        for n in range(2,51):
+            print("Computing greedy ROM for n =", n, " time elapsed:", time.time() - t)
+            t = time.time()
+            Vrom1 = VromGreedy(pTrain, VromPrev=Vrom1)[0] # greedily add to Vrom
+            error2.append(error(Vrom1, testP)[0].get())
         plt.plot(range(2,51), error1,color = blues[k] ,label="Non-Greedy ROM"+str(k))
-        # plt.plot(range(2,51), error2,color= reds[k], label="Greedy ROM"+str(k))
+        plt.plot(range(2,51), error2,color= reds[k], label="Greedy ROM"+str(k))
     plt.xlabel("Number of basis functions")
     plt.ylabel("Argmax H1 norm error")
     plt.title("Comparison of Greedy and Non-Greedy ROM")
@@ -224,8 +224,8 @@ def ex3(alternative = False):
     plt.show()
 
 
-ex3()
-# ex3(True) #alternative True, alternative P
+# ex3()
+ex3(True) #alternative True, alternative P
 
 
 def test():
