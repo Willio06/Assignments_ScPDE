@@ -3,6 +3,7 @@ from typing import Callable, Any
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import seaborn as sns
+from scipy.linalg import expm
 class thetaMethod:
     def __init__(self, theta, A, b: Callable[[float], Any], init: np.ndarray, del_t =1/10, TimeElements=100):
         """
@@ -71,9 +72,7 @@ class ExpRungeKutta:
         self.TimeElements = TimeElements
         self.TimeLength = int(TimeElements*del_t)
 
-        self.eigenvalues =np.linalg.eigvals(self.del_t *A)
-        self.eigenvectors = np.linalg.eig(self.del_t *A)[1]
-        self.expA = self.eigenvectors @ np.diag(np.exp(self.eigenvalues)) @ np.linalg.inv(self.eigenvectors)
+        self.expA = expm(self.A*del_t)
         self.phi1 = np.linalg.inv(del_t* self.A)@(self.expA - np.identity(self.N_x))
         self.phi2 = np.linalg.inv(del_t* self.A)@(self.phi1 - np.identity(self.N_x))
     def __iter__(self):
@@ -145,20 +144,57 @@ class HeatTransfer:
         self.vectorb = b
 
 np.set_printoptions(linewidth=200)
-N_x = 3
-N_t = 100
-classs = HeatTransfer(N_x, Bi=100000, omega=1)
-# print(classs.matrixA)
+def generalTest(Bi=1,omega=1,Nx=10,Nt=100, delt=0.1):
+    classs = HeatTransfer(Nx, Bi=Bi, omega=omega)
+    # print(classs.matrixA)
 
-plt.subplot(1,2,1)
-solver = thetaMethod(0.5, classs.matrixA, classs.vectorb, np.zeros(N_x),del_t=0.1, TimeElements=N_t)
-# for (n,un) in solver:
-#     print("step ",n,":  ",un)
-solver.solve()
-solver.plotHeat()
+    plt.subplot(1,2,1)
+    solver = thetaMethod(0.5, classs.matrixA, classs.vectorb, np.zeros(Nx),del_t=delt, TimeElements=Nt)
+    # for (n,un) in solver:
+    #     print("step ",n,":  ",un)
+    solver.solve()
+    solver.plotHeat()
 
-plt.subplot(1,2,2)
-solverExp = ExpRungeKutta(classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=0.1, TimeElements=N_t)
-solverExp.solve()
-solverExp.plotHeat()
-plt.show()
+    plt.subplot(1,2,2)
+    solverExp = ExpRungeKutta(classs.matrixA, classs.vectorb, np.zeros(Nx), del_t=delt, TimeElements=Nt)
+    solverExp.solve()
+    solverExp.plotHeat()
+    plt.show() 
+
+def MethodOrder(N_x=3):
+
+    classs = HeatTransfer(N_x, Bi=1, omega=1)
+    P = []
+    print("-------------- Exponential Runge-Kutta Method Order --------------")
+    for n in np.arange(10,1000,10):
+        xn = ExpRungeKutta(classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=10/n, TimeElements=n).solve()
+        x2n = ExpRungeKutta(classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=10/(2*n), TimeElements=2*n).solve()
+        x4n = ExpRungeKutta(classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=10/(4*n), TimeElements=4*n).solve()
+        a = x2n[:,-1] - xn[:,-1]
+        b = x4n[:,-1] - x2n[:,-1]
+        p=np.log2(np.divide(a, b))
+        P.append(np.mean(p))
+        # print("n=", n, " Order=", np.mean(p))
+    plt.plot(np.arange(10,1000,10), P, label="Exponential Runge-Kutta Method Order")
+    for theta in [0,0.5,1]:
+        print("-------------- Theta Method Order for theta=", theta, "--------------")
+        P = []
+        for n in np.arange(10,1000,10):
+            xn = thetaMethod(theta, classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=10/n, TimeElements=n).solve()
+            x2n = thetaMethod(theta, classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=10/(2*n), TimeElements=2*n).solve()
+            x4n = thetaMethod(theta, classs.matrixA, classs.vectorb, np.zeros(N_x), del_t=10/(4*n), TimeElements=4*n).solve()
+            a = x2n[:,-1] - xn[:,-1]
+            b = x4n[:,-1] - x2n[:,-1]
+            p=np.log2(np.divide(a, b))
+            P.append(np.mean(p))
+            # print("n=", n, " Order=", np.mean(p))
+        plt.plot(np.arange(10,1000,10), P, label="Theta Method Order for theta="+str(theta))
+    plt.xlabel("Number of Time elements n")
+    plt.ylabel("Order of Convergence")
+    plt.ylim(0.5, 2.5)
+    plt.legend()
+    plt.title("Order of Convergence for different Methods")
+    plt.show()
+
+generalTest()
+MethodOrder()
