@@ -118,6 +118,16 @@ def ex1_5b():
             prob1.comparePlot(y)
         plt.show()
 
+def test():
+    n = 10
+    prob = problem1(n, 0, 1, [1, 0, 1])
+    prob1 = FiniteElements_1D(0,1,prob.A, prob.b, boundary=0, added_boundary=False)
+    prob1.solve()
+    x = np.linspace(0, 1,100)
+    y = prob.realSolution(x)
+    prob1.comparePlot(y)
+    plt.show()
+
 def ex1_5c():
     Errors1 =[] #L2 error
     Errors2=[] #H1 error
