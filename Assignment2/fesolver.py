@@ -12,6 +12,7 @@ import scipy  # type: ignore[import-untyped]
 import matplotlib as mpl  # type: ignore[import-untyped]
 import matplotlib.pyplot as plt  # type: ignore[import-untyped]
 import numpy as np
+import argparse
 
 
 def galerkin_discretization(
@@ -25,26 +26,22 @@ def galerkin_discretization(
     fe = dofh.fe
     grid = dofh.grid
 
-    for k, triangle in enumerate(grid.triangles):   
+    for k, _ in enumerate(grid.triangles):   
         # Get triangle vertex coordinates (as Points)
         triangle_pts = Triangle(tuple([grid.nodes[dofh.local_to_global_map[(k,i)]] for i in range(3)]))
         transform = TriangleTransform(triangle_pts)
-
         local_A = np.zeros((len(fe), len(fe)))
         local_b = np.zeros(len(fe))
-
         for qp, w in zip(qd.quad_points, qd.weights):
             det_J = np.abs(np.linalg.det(transform.jacobian))
             x = transform.F_T(qp)
-
             for i in range(len(fe)):
                 grad_i = transform.transform_grad(fe.grad(i, qp))
                 for j in range(len(fe)):
                     grad_j = transform.transform_grad(fe.grad(j, qp))
                     local_A[i, j] += w * det_J * np.dot(grad_i, grad_j)
-
                 local_b[i] += w * det_J * rhs(x) * fe.value(i, qp)
-
+        # print(local_b)
         for i_local in range(len(fe)):
             i_global = dofh.local_to_global(k, i_local)
             b[i_global] += local_b[i_local]
@@ -71,6 +68,7 @@ def plot_solution(
         three_d: bool = True,
         save_fig: bool = True
 ) -> tuple[mpl.figure.Figure, mpl.axes.Axes]:
+    print(three_d)
     Path('solution').mkdir(exist_ok=True)
     xs = np.empty(len(dofh))
     ys = np.empty(len(dofh))
@@ -99,7 +97,8 @@ def plot_solution(
     return fig, ax
 
 
-def main(filename: str) -> None:
+def main(filename: str, threeD= True) -> None:
+    print(threeD)
     t = time.monotonic()
     print(f'Reading {filename}... ', end='', flush=True)
     grid = Grid.read_from_file(filename)
@@ -122,9 +121,14 @@ def main(filename: str) -> None:
     print('Solving linear system... ', end='', flush=True)
     x = scipy.sparse.linalg.spsolve(A, b)
     print(f'took {time.monotonic() - t:.3f}s')
-    plot_solution(dofh, x)
+    plot_solution(dofh, x, three_d=threeD)
     plt.show()
 
 
 if __name__ == '__main__':
-    main('data/fine_mesh.txt')
+    parser = argparse.ArgumentParser(usage="FEM 3D solver", description=" --mesh default=fine, --plot3D  default=true ")
+    parser.add_argument("--mesh",default="fine",type=str, help="choose mesh, options are 'coarse' or 'fine', DEFAULT='fine'")
+    parser.add_argument("--plot3D",default=1,type=int, help="plot 3D, 1( true) or 2 (false), else 2D plot, DEFAULT=1")
+    args = parser.parse_args()
+    print(args.plot3D)
+    main('data/'+args.mesh+'_mesh.txt', threeD=bool(args.plot3D))
