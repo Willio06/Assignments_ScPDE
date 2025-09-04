@@ -66,7 +66,8 @@ def plot_solution(
         *,
         plot_grid: bool = True,
         three_d: bool = True,
-        save_fig: bool = True
+        save_fig: bool = True,
+        name: str = 'fine'
 ) -> tuple[mpl.figure.Figure, mpl.axes.Axes]:
     print(three_d)
     Path('solution').mkdir(exist_ok=True)
@@ -87,17 +88,18 @@ def plot_solution(
                 ys[i] = p[1]
             ax.triplot(xs, ys, dofh.grid.triangles)
         if save_fig:
-            plt.savefig('solution/solution-2d.png')
+            plt.savefig('solution/solution-'+name+'-2d.png')
     else:
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         pos = ax.plot_trisurf(xs, ys, x, cmap=plt.cm.viridis)
         fig.colorbar(pos, ax=ax)
         if save_fig:
-            plt.savefig('solution/solution-3d.png')
+            plt.savefig('solution/solution-'+name+'-3d.png')
     return fig, ax
 
 
-def main(filename: str, threeD= True) -> None:
+def main(meshname: str, threeD= True) -> None:
+    filename = 'data/'+meshname+'_mesh.txt'
     print(threeD)
     t = time.monotonic()
     print(f'Reading {filename}... ', end='', flush=True)
@@ -121,7 +123,7 @@ def main(filename: str, threeD= True) -> None:
     print('Solving linear system... ', end='', flush=True)
     x = scipy.sparse.linalg.spsolve(A, b)
     print(f'took {time.monotonic() - t:.3f}s')
-    plot_solution(dofh, x, three_d=threeD)
+    plot_solution(dofh, x, three_d=threeD, name=meshname)
     plt.show()
 
 
@@ -131,4 +133,4 @@ if __name__ == '__main__':
     parser.add_argument("--plot3D",default=1,type=int, help="plot 3D, 1( true) or 2 (false), else 2D plot, DEFAULT=1")
     args = parser.parse_args()
     print(args.plot3D)
-    main('data/'+args.mesh+'_mesh.txt', threeD=bool(args.plot3D))
+    main(args.mesh, threeD=bool(args.plot3D))
