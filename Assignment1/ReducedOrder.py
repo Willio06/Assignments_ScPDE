@@ -225,7 +225,7 @@ def ex3(alternative = False):
 
 
 # ex3()
-ex3(True) #alternative True, alternative P
+# ex3(True) #alternative True, alternative P
 
 
 def test():
@@ -245,8 +245,15 @@ def test2():
     mu_test = [0.5, 0.3, 0.7]
     mus_basis = [[0.1, 0.2, 0.4], [0.8, 0.6, 0.9]]  # basis parameters
     # Create ROM with mu_test as the target parameter
-    rom = ReducedOrder(mus_basis, mu_test)
+    
+    # See how close it is when using ROM as regular FEM
+    # just use the test also as basis
+    rom = ReducedOrder([mu_test], mu_test)
+    # rom = ReducedOrder(mus_basis, mu_test)
+    
     x_rom = rom.solve()  # ROM solution
     x_fem = rom.FEMsolve(mu_test)  # FEM solution for same parameter
     print("Error for same parameter:", H1_norm_approx(x_fem - x_rom, h=1/N))
-# test2()
+    rom.plotter(cp.asnumpy(x_rom), cp.asnumpy(x_fem), title="ROM vs FEM for same parameter", xlabel="x", ylabel="u(x)", labelx="ROM", labely="FEM")
+    plt.show()
+test2()
