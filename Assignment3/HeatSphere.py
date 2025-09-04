@@ -144,7 +144,19 @@ class HeatTransfer:
         self.vectorb = b
 
 np.set_printoptions(linewidth=200)
-def generalTest(Bi=1,omega=1,Nx=10,Nt=100, delt=0.1):
+def test(Bi=10000,omega=2,Nx=3,Nt=100, delt=0.1):
+    classs = HeatTransfer(Nx, Bi=Bi, omega=omega)
+    print(classs.matrixA)
+
+    solver = thetaMethod(0.5, classs.matrixA, classs.vectorb, np.zeros(Nx),del_t=delt, TimeElements=Nt)
+    for (n,un) in solver:
+        print("step ",n,":  ",un)
+    solver.solve()
+    solver.plotHeat()
+    plt.show()
+# test()
+
+def generalTest(Bi=10000,omega=2,Nx=3,Nt=1000, delt=0.1):
     classs = HeatTransfer(Nx, Bi=Bi, omega=omega)
     # print(classs.matrixA)
 
